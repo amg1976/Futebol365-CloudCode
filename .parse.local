@@ -1,0 +1,10 @@
+{
+  "applications": {
+    "Futebol365": {
+      "applicationId": "0N1kCdAA5d2A7vMyrEqJON06vZVfjp4z5NSgjNzD"
+    },
+    "_default": {
+      "link": "Futebol365"
+    }
+  }
+}
