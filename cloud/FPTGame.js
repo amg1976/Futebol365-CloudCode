@@ -4,25 +4,28 @@ exports.create = function() {
 		updateFromXml: function(xmlItem) {
 			this.setTitle(xmlItem[i].title.text());
 			this.set("link", xmlItem[i].link.text());
-		}
+		},
 
 		setTitle: function(title) {
 			this.set("title", title);
 			var matches = parseTitle(title);
 			this.set("tvChannel", matches[1]);
-			this.set("homeTeam", matches[2]);
-			this.set("awayTeam", matches[3]);
 			this.set("dateString", matches[4]);
 			this.set("date", dateFromString(matches[4]));
+			this.teamNames = [ matches[2], matches[3] ];
+		},
+
+		initialize: function(attrs, options) {
+			this.teamNames = Array();
 		}
 
 	}, {
 
 		newFromXml: function(xmlItem) {
-			var newGame = new FPTGame();
-			newGame.setTitle(xmlItem[i].title.text());
-			newGame.set("guid", xmlItem[i].guid.text());
-			newGame.set("link", xmlItem[i].link.text());
+			var newGame = new Parse.Object("FPTGame");
+			newGame.setTitle(xmlItem.title.text());
+			newGame.set("guid", xmlItem.guid.text());
+			newGame.set("link", xmlItem.link.text());
 			return newGame;
 		}
 
