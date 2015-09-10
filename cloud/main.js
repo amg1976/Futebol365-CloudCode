@@ -83,7 +83,9 @@ Parse.Cloud.job("update_tvgames", function(request, response) {
 											return item.get("name") == game.teamNames[1];
 										})[0];
 										game.set("homeTeam", homeTeam);
+										game.set("homeTeamName", homeTeam.get("name"));
 										game.set("awayTeam", awayTeam);
+										game.set("awayTeamName", awayTeam.get("name"));
 									}
 
 									Parse.Object.saveAll(allUniqueTeams, {
