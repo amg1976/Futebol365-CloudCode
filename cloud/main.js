@@ -4,11 +4,8 @@ var FPTGame = game.create();
 var team = require("cloud/FPTTeam.js")
 var FPTTeam = team.create();
 
-/*
-Parse.Cloud.job("update_tvgames", function(request, status) {
+Parse.Cloud.job("update_tvgames", function(request, response) {
 	Parse.Cloud.useMasterKey();
-	*/
-Parse.Cloud.define("update_tvgames", function(request, response) {
 	Parse.Cloud.httpRequest({
 	  url: 'http://feeds.feedburner.com/futebol365/futebolnatv/'
 	}).then(function(httpResponse) {
@@ -22,46 +19,47 @@ Parse.Cloud.define("update_tvgames", function(request, response) {
 					allItems.push(item);
 				});
 
-				var teamsQuery = new Parse.Query(FPTTeam);
-				teamsQuery.limit(1000);
-				teamsQuery.find({
-					success: function(teamResults) {
+				var query = new Parse.Query(FPTGame);
+				var allGuids = allItems.map(function(element) { return element.guid.text() });
+				query.limit(1000);
+				query.containedIn("guid", allGuids);
+				query.find({
+					success: function(results) {
+						var itemsToUpdate = Array();
+						var itemsToSave = allItems.filter(function(element1) {
+							var currentGuid = element1.guid.text();
+							var filteredResults = results.filter(function(element2) {
+								return element2.get("guid") == currentGuid;
+							});
+							if (filteredResults.length == 0) {
+								return true;
+							} else {
+								var item = filteredResults[0];
+								item.setTitle(element1.title.text());
+								item.set("link", element1.link.text());
+								itemsToUpdate.push(item);
+								return false;
+							}
+						});
+						for (var i = 0; i < itemsToSave.length; i++) {
+							itemsToSave[i] = FPTGame.newFromXml(itemsToSave[i]);
+						};
+						
+						var itemsToSubmit = itemsToSave.concat(itemsToUpdate);
+						
+						if (itemsToSubmit.length > 0) {
 
-						var query = new Parse.Query(FPTGame);
-						var allGuids = allItems.map(function(element) { return element.guid.text() });
-						query.limit(1000);
-						query.containedIn("guid", allGuids);
-						query.find({
-							success: function(results) {
-								var itemsToUpdate = Array();
-								var itemsToSave = allItems.filter(function(element1) {
-									var currentGuid = element1.guid.text();
-									var filteredResults = results.filter(function(element2) {
-										return element2.get("guid") == currentGuid;
-									});
-									if (filteredResults.length == 0) {
-										return true;
-									} else {
-										var item = filteredResults[0];
-										item.setTitle(element1.title.text());
-										item.set("link", element1.link.text());
-										itemsToUpdate.push(item);
-										return false;
-									}
-								});
-								for (var i = 0; i < itemsToSave.length; i++) {
-									itemsToSave[i] = FPTGame.newFromXml(itemsToSave[i]);
-								};
-								
-								var itemsToSubmit = itemsToSave.concat(itemsToUpdate);
-								
-								if (itemsToSubmit.length > 0) {
+							var allTeamNames = Array();
+							for (var i = 0; i < itemsToSubmit.length; i++) {
+								allTeamNames = allTeamNames.concat(itemsToSubmit[i].teamNames);
+							}
+							var allUniqueTeams = arrayUnique(allTeamNames);
 
-									var allTeamNames = Array();
-									for (var i = 0; i < itemsToSubmit.length; i++) {
-										allTeamNames = allTeamNames.concat(itemsToSubmit[i].teamNames);
-									}
-									var allUniqueTeams = arrayUnique(allTeamNames);
+							var teamsQuery = new Parse.Query(FPTTeam);
+							teamsQuery.limit(1000);
+							teamsQuery.containedIn("name", allUniqueTeams);
+							teamsQuery.find({
+								success: function(teamResults) {
 
 									for (var i = 0; i < allUniqueTeams.length; i++) {
 										var name = allUniqueTeams[i];
@@ -100,18 +98,18 @@ Parse.Cloud.define("update_tvgames", function(request, response) {
 										}
 									});
 
-								} else {
-									response.success("No items to save");
+								},
+								error: function(error) {
+									response.error("Error in teams query: " + error);
 								}
-							},
-							error: function(error) {
-								response.error("Error in query: " + error);
-							}
-						});
+							});
 
+						} else {
+							response.success("No items to save");
+						}
 					},
 					error: function(error) {
-						response.error("Error in teams query: " + error);
+						response.error("Error in query: " + error);
 					}
 				});
 
