@@ -38,9 +38,9 @@ function parseTitle(title) {
 }
 
 function dateFromString(dateString) {
-	var m = new moment(dateString, "YYYY-MM-DD[ às ]HH:mm", false);
-	m.zone("+01:00");
-	return m.utc().toDate();
+	var dateStringWithTimezone = dateString + " +01:00"
+	var m = new moment(dateStringWithTimezone, "YYYY-MM-DD[ às ]HH:mm Z", false);
+	return m.toDate();
 }
 
 var moment = require('moment');
