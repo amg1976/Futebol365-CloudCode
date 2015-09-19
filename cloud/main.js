@@ -4,17 +4,13 @@ var FPTGame = game.create();
 var team = require("cloud/FPTTeam.js")
 var FPTTeam = team.create();
 
-function makeGamesList() {
+function makeGamesList(xmlObject) {
 
 	var arr = Array();
-	arr.push.apply(arr, arguments);
 
-	arr.loadFromRSSResponse = function(xmlObject) {
-		var ownArray = this;
-		xmlObject.rss.channel.item.each(function(index, item) { 
-			ownArray.push(item);
-		});
-	}
+	xmlObject.rss.channel.item.each(function(index, item) { 
+		arr.push(item);
+	});
 
 	arr.convertToFPTGames = function(queryResults) {
 
@@ -38,13 +34,53 @@ function makeGamesList() {
 
 	}
 
-	arr.getUniqueTeamNames = function() {
+	arr.getUniqueTeams = function() {
 
 		var allTeamNames = Array();
 		for (var i = 0; i < arr.length; i++) {
 			allTeamNames = allTeamNames.concat(arr[i].teamNames);
 		}
-		return arrayUnique(allTeamNames);
+
+		var arrayUniqueTeams = arrayUnique(allTeamNames);
+
+		arrayUniqueTeams.convertToFPTTeams = function(queryResults) {
+
+			var ownArray = this;
+			for (var i = 0; i < ownArray.length; i++) {
+				var name = ownArray[i];
+				var filtered = queryResults.filter(function(item) {
+					return item.get("name") == name;
+				});
+				if (filtered.length == 0) {
+					var newTeam = FPTTeam.newWithName(name);
+					ownArray[i] = newTeam;
+				} else {
+					ownArray[i] = filtered[0];
+				}
+			};
+
+		}
+
+		return arrayUniqueTeams;
+
+	}
+
+	arr.updateTeams = function(allTeams) {
+
+		var ownArray = this;
+		for (var i = 0; i < ownArray.length; i++) {
+			var game = ownArray[i];
+			var homeTeam = allTeams.filter(function(item) {
+				return item.get("name") == game.teamNames[0];
+			})[0];
+			var awayTeam = allTeams.filter(function(item) {
+				return item.get("name") == game.teamNames[1];
+			})[0];
+			game.set("homeTeam", homeTeam);
+			game.set("homeTeamName", homeTeam.get("name"));
+			game.set("awayTeam", awayTeam);
+			game.set("awayTeamName", awayTeam.get("name"));
+		}
 
 	}
 
@@ -62,21 +98,20 @@ Parse.Cloud.job("update_tvgames", function(request, response) {
 			if (error) {
 				response.error(error);
 			} else {
-				var allItems = makeGamesList();
-				allItems.loadFromRSSResponse(result);
-
+				var allGames = makeGamesList(result);
+				
 				var query = new Parse.Query(FPTGame);
-				var allGuids = allItems.map(function(element) { return element.guid.text() });
+				var allGuids = allGames.map(function(element) { return element.guid.text() });
 				query.limit(1000);
 				query.containedIn("guid", allGuids);
 				query.find({
 					success: function(results) {
 
-						allItems.convertToFPTGames(results);
+						allGames.convertToFPTGames(results);
 						
-						if (allItems.length > 0) {
+						if (allGames.length > 0) {
 
-							var allUniqueTeams = allItems.getUniqueTeamNames();
+							var allUniqueTeams = allGames.getUniqueTeams();
 
 							var teamsQuery = new Parse.Query(FPTTeam);
 							teamsQuery.limit(1000);
@@ -84,36 +119,12 @@ Parse.Cloud.job("update_tvgames", function(request, response) {
 							teamsQuery.find({
 								success: function(teamResults) {
 
-									for (var i = 0; i < allUniqueTeams.length; i++) {
-										var name = allUniqueTeams[i];
-										var filtered = teamResults.filter(function(item) {
-											return item.get("name") == name;
-										});
-										if (filtered.length == 0) {
-											var newTeam = FPTTeam.newWithName(name);
-											allUniqueTeams[i] = newTeam;
-										} else {
-											allUniqueTeams[i] = filtered[0];
-										}
-									};
-
-									for (var i = 0; i < allItems.length; i++) {
-										var game = allItems[i];
-										var homeTeam = allUniqueTeams.filter(function(item) {
-											return item.get("name") == game.teamNames[0];
-										})[0];
-										var awayTeam = allUniqueTeams.filter(function(item) {
-											return item.get("name") == game.teamNames[1];
-										})[0];
-										game.set("homeTeam", homeTeam);
-										game.set("homeTeamName", homeTeam.get("name"));
-										game.set("awayTeam", awayTeam);
-										game.set("awayTeamName", awayTeam.get("name"));
-									}
+									allUniqueTeams.convertToFPTTeams(teamResults);
+									allGames.updateTeams(allUniqueTeams);
 
 									Parse.Object.saveAll(allUniqueTeams, {
 										success: function(teamList) {
-											Parse.Object.saveAll(allItems, {
+											Parse.Object.saveAll(allGames, {
 												success: function(list) { response.success("Saved " + list.length + " games, " + teamList.length + " teams"); },
 												error: function(error) { response.error("Error saving: " + error); }
 											});
