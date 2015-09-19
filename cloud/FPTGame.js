@@ -8,7 +8,7 @@ exports.create = function() {
 
 		setTitle: function(title) {
 			this.set("title", title);
-			var matches = parseTitle(title);
+			var matches = parseGameTitle(title);
 			this.set("tvChannel", matches[1]);
 			this.set("dateString", matches[4]);
 			this.set("date", dateFromString(matches[4]));
@@ -32,7 +32,7 @@ exports.create = function() {
 	});
 }
 
-function parseTitle(title) {
+function parseGameTitle(title) {
 	var re = new RegExp('^([a-zA-Z0-9 .]+): (.+) - (.+) \\((\\d{4}-\\d{2}-\\d{2} às \\d{2}:\\d{2})\\)$');
 	return re.exec(title);
 }
